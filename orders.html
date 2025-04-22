@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Orders</title>
+    <link rel="stylesheet" href="styles.css">
+    <script>
+        function markAsCompleted(orderId) {
+            document.getElementById(orderId).style.textDecoration = "line-through";
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <!-- Hier komt bijvoorbeeld je logo-->
+        <nav>
+            <ul>
+                <li><a href="index.html">Home</a></li>
+                <li><a href="login.html">Login</a></li>
+                <li><a href="signup.html">Sign Up</a></li>
+                <li><a href="menu.html">Menu</a></li>
+                <li><a href="shoppingcart.html">Shopping Cart</a></li>
+                <li><a href="orderdetails.html">Order Details</a></li>
+                <li><a href="orders.html">Orders</a></li>
+                <li><a href="privacystatement.html">Privacy Statement</a></li>
+            </ul>
+        </nav>
+        
+    </header>
+    
+    <main>
+        <h1>Customer Orders</h1>
+        <table border="1" width="100%">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer Name</th>
+                    <th>Items</th>
+                    <th>Total Price</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr id="order1">
+                    <td>#001</td>
+                    <td>John Doe</td>
+                    <td>Margherita Pizza, Coca-Cola</td>
+                    <td>$14.00</td>
+                    <td>Pending</td>
+                    <td><button onclick="markAsCompleted('order1')">Complete</button></td>
+                </tr>
+                <tr id="order2">
+                    <td>#002</td>
+                    <td>Jane Smith</td>
+                    <td>Pepperoni Pizza, Fanta</td>
+                    <td>$12.00</td>
+                    <td>Pending</td>
+                    <td><button onclick="markAsCompleted('order2')">Complete</button></td>
+                </tr>
+            </tbody>
+        </table>
+    </main>
+    
+    <footer>
+        <!--Hier komt de tekst onderaan de pagina te staan-->
+    </footer>
+</body>
+</html>
