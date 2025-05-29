@@ -1,0 +1,100 @@
+/* General layout and typography */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #fff;
+    color: #222;
+    margin: 0;
+    padding: 0;
+    text-align: center;
+}
+
+/* Navigation bar */
+nav {
+    background-color: #006341; /* New York Pizza green / Domino’s blue: #0066b2 */
+    padding: 15px 0;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+nav ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+nav ul li {
+    display: inline-block;
+    margin: 0 20px;
+}
+
+nav ul li a {
+    color: white;
+    text-decoration: none;
+    font-size: 18px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+nav ul li a:hover {
+    text-decoration: underline;
+}
+
+/* Page content */
+main {
+    padding: 30px 20px;
+}
+
+h1, h2 {
+    color: #006341;
+    margin-bottom: 20px;
+}
+
+/* Form styling */
+form {
+    background-color: #f4f4f4;
+    border: 2px solid #ccc;
+    border-radius: 12px;
+    max-width: 500px;
+    margin: 20px auto;
+    padding: 25px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    text-align: left;
+}
+
+label {
+    display: block;
+    margin-bottom: 12px;
+    font-size: 16px;
+}
+
+/* Buttons */
+button {
+    background-color: #ed1c24; /* Domino’s red / NYP accent red */
+    color: white;
+    padding: 12px 25px;
+    border: none;
+    border-radius: 5px;
+    font-size: 17px;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 20px;
+    transition: background-color 0.3s ease;
+}
+
+button:hover {
+    background-color: #c4161c;
+}
+
+/* Footer */
+footer {
+    background-color: #006341;
+    color: white;
+    padding: 12px;
+    font-size: 14px;
+    margin-top: 40px;
+}
+
+nav a.active {
+    border-bottom: 2px solid #fff;
+    color: #ffcc00;
+}
