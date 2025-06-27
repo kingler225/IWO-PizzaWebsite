@@ -9,11 +9,28 @@ if (!isset($_SESSION['user'])) {
 require_once __DIR__ . '/../DBConnections/db_connection.php';
 require_once __DIR__ . '/../DBConnections/db_querys.php';
 
+$conn = maakVerbinding();
+
 $role = $_SESSION['user']['role'];
 $username = $_SESSION['user']['username'];
 
-$conn = maakVerbinding();
+// Handle status update if Personnel
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['new_status']) && $role === 'Personnel') {
+    $orderId = (int) $_POST['order_id'];
+    $newStatus = (int) $_POST['new_status'];
+    updateOrderStatus($conn, $orderId, $newStatus);
+    header("Location: orders.php");
+    exit;
+}
+
 $orders = haalBestellingenOp($conn, $role, $username);
+
+// Optional: status labels for better readability
+$statusLabels = [
+    1 => 'Received',
+    2 => 'In Progress',
+    3 => 'Completed'
+];
 ?>
 
 <!DOCTYPE html>
@@ -23,14 +40,10 @@ $orders = haalBestellingenOp($conn, $role, $username);
     <meta charset="UTF-8">
     <title><?= $role === 'Personnel' ? 'All Orders' : 'My Orders' ?></title>
     <link rel="stylesheet" href="../css/styles.css">
-    <script>
-        function markAsCompleted(rowId) {
-            document.getElementById(rowId).style.textDecoration = "line-through";
-        }
-    </script>
 </head>
 
 <body>
+
     <?php include_once __DIR__ . '/../includes/navbar.php'; ?>
 
     <main>
@@ -44,8 +57,8 @@ $orders = haalBestellingenOp($conn, $role, $username);
                     <tr>
                         <th>Order ID</th>
                         <th>Customer Name</th>
-                        <th>Items</th>
-                        <th>Total Price</th>
+                        <th>Address</th>
+                        <th>Date/Time</th>
                         <th>Status</th>
                         <?php if ($role === 'Personnel'): ?>
                             <th>Action</th>
@@ -54,17 +67,32 @@ $orders = haalBestellingenOp($conn, $role, $username);
                 </thead>
                 <tbody>
                     <?php foreach ($orders as $order): ?>
-                        <?php
-                        $rowId = 'order' . htmlspecialchars($order['order_id']);
-                        ?>
-                        <tr id="<?= $rowId ?>">
-                            <td>#<?= htmlspecialchars($order['order_id']) ?></td>
-                            <td><?= htmlspecialchars($order['client_name']) ?></td>
-                            <td><?= htmlspecialchars($order['items']) ?></td>
-                            <td>€<?= number_format($order['total_price'], 2, ',', '.') ?></td>
-                            <td><?= htmlspecialchars($order['status']) ?></td>
+                        <tr id="order<?= htmlspecialchars($order['order_id']) ?>">
+                            <td>
+                                <a href="orderdetails.php?order_id=<?= urlencode($order['order_id']) ?>">
+                                    #<?= htmlspecialchars($order['order_id']) ?>
+                                </a>
+                            </td>
+                            <td><?= htmlspecialchars($order['client_name'] ?? $order['client_username']) ?></td>
+                            <td><?= htmlspecialchars($order['address']) ?></td>
+                            <td><?= htmlspecialchars($order['datetime']) ?></td>
+                            <td>
+                                <?php if ($role === 'Personnel'): ?>
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="order_id" value="<?= $order['order_id'] ?>">
+                                        <select name="new_status">
+                                            <option value="1" <?= $order['status'] == 1 ? 'selected' : '' ?>>Received</option>
+                                            <option value="2" <?= $order['status'] == 2 ? 'selected' : '' ?>>In Progress</option>
+                                            <option value="3" <?= $order['status'] == 3 ? 'selected' : '' ?>>Completed</option>
+                                        </select>
+                                        <button type="submit">Update</button>
+                                    </form>
+                                <?php else: ?>
+                                    <?= $statusLabels[$order['status']] ?? 'Unknown' ?>
+                                <?php endif; ?>
+                            </td>
                             <?php if ($role === 'Personnel'): ?>
-                                <td><button onclick="markAsCompleted('<?= $rowId ?>')">Complete</button></td>
+                                <td><!-- Optional: Add extra personnel-only action here --></td>
                             <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>

@@ -1,75 +1,98 @@
-/* General layout and typography */
+/* Reset en basisinstellingen */
+* {
+    box-sizing: border-box;
+}
+
 body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     background-color: #fff;
     color: #222;
     margin: 0;
     padding: 0;
-    text-align: center;
+    line-height: 1.6;
 }
 
 /* Navigation bar */
 nav {
-    background-color: #006341; /* New York Pizza green / Domino’s blue: #0066b2 */
+    background-color: #006341;
     padding: 15px 0;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
 }
 
 nav ul {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 15px;
     list-style: none;
     padding: 0;
     margin: 0;
 }
 
-nav ul li {
-    display: inline-block;
-    margin: 0 20px;
-}
-
 nav ul li a {
     color: white;
     text-decoration: none;
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    padding: 8px 12px;
+    border-radius: 4px;
+    transition: background-color 0.3s;
 }
 
-nav ul li a:hover {
-    text-decoration: underline;
+nav ul li a:hover,
+nav a.active {
+    background-color: #004e32;
+    color: #ffcc00;
 }
 
 /* Page content */
 main {
     padding: 30px 20px;
+    max-width: 1000px;
+    margin: 0 auto;
 }
 
-h1, h2 {
+/* Typography */
+h1,
+h2 {
     color: #006341;
     margin-bottom: 20px;
+    text-align: center;
 }
 
-/* Form styling */
+/* Forms */
 form {
     background-color: #f4f4f4;
-    border: 2px solid #ccc;
+    border: 1px solid #ccc;
     border-radius: 12px;
     max-width: 500px;
     margin: 20px auto;
     padding: 25px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.05);
-    text-align: left;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
 label {
     display: block;
-    margin-bottom: 12px;
-    font-size: 16px;
+    margin-bottom: 8px;
+    font-weight: bold;
+    font-size: 15px;
+}
+
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 18px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 15px;
 }
 
 /* Buttons */
 button {
-    background-color: #ed1c24; /* Domino’s red / NYP accent red */
+    background-color: #ed1c24;
     color: white;
     padding: 12px 25px;
     border: none;
@@ -77,12 +100,32 @@ button {
     font-size: 17px;
     font-weight: bold;
     cursor: pointer;
-    margin-top: 20px;
+    width: 100%;
     transition: background-color 0.3s ease;
 }
 
 button:hover {
     background-color: #c4161c;
+}
+
+/* Tables */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+    font-size: 15px;
+}
+
+table th,
+table td {
+    padding: 12px;
+    border: 1px solid #ddd;
+    text-align: center;
+}
+
+table thead {
+    background-color: #006341;
+    color: white;
 }
 
 /* Footer */
@@ -92,9 +135,26 @@ footer {
     padding: 12px;
     font-size: 14px;
     margin-top: 40px;
+    text-align: center;
 }
 
-nav a.active {
-    border-bottom: 2px solid #fff;
-    color: #ffcc00;
+/* Responsive layout */
+@media (max-width: 768px) {
+    nav ul {
+        flex-direction: column;
+        align-items: center;
+    }
+
+    form {
+        padding: 15px;
+    }
+
+    button {
+        width: 100%;
+    }
+
+    table th,
+    table td {
+        font-size: 14px;
+    }
 }

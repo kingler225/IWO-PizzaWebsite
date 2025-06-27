@@ -70,6 +70,17 @@ function plaatsBestelling(PDO $conn, ?string $username, string $clientName, stri
     }
 }
 
+function checkWachtwoord(string $ingevoerd, string $opgeslagen): bool
+{
+    // Is het wachtwoord al gehashed?
+    if (password_get_info($opgeslagen)['algo']) {
+        return password_verify($ingevoerd, $opgeslagen);
+    }
+
+    // Plaintext wachtwoord (alleen tijdelijk toegestaan)
+    return $ingevoerd === $opgeslagen;
+}
+
 function loginGebruiker(array $postData): ?string
 {
     require_once __DIR__ . '/db_connection.php';
@@ -79,80 +90,80 @@ function loginGebruiker(array $postData): ?string
     $password = $postData['password'] ?? '';
 
     try {
-        $stmt = $conn->prepare("SELECT * FROM [User] WHERE username = :username AND password = :password");
-        $stmt->execute([
-            'username' => $username,
-            'password' => $password // 🔐 Use password_hash() in production
-        ]);
-
+        // Haal alleen de nodige velden op
+        $stmt = $conn->prepare("SELECT username, password, role FROM [User] WHERE username = :username");
+        $stmt->execute(['username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        if ($user) {
-            session_start();
-            $_SESSION['user'] = [
-                'username' => $user['username'],
-                'role' => $user['role']
-            ];
-            header("Location: ../index.php");
-            exit;
-        } else {
+        if (!$user || !checkWachtwoord($password, $user['password'])) {
             return "Ongeldige gebruikersnaam of wachtwoord.";
         }
+
+        // ✅ Upgrade wachtwoord naar hash als het nog plaintext was
+        if (!password_get_info($user['password'])['algo']) {
+            $nieuwHash = password_hash($password, PASSWORD_DEFAULT);
+            $update = $conn->prepare("UPDATE [User] SET password = :hash WHERE username = :username");
+            $update->execute([
+                'hash' => $nieuwHash,
+                'username' => $user['username']
+            ]);
+        }
+
+        // ✅ Login en sessie
+        session_start();
+        session_regenerate_id(true);
+        $_SESSION['user'] = [
+            'username' => $user['username'],
+            'role' => $user['role']
+        ];
+        header("Location: ../index.php");
+        exit;
     } catch (PDOException $e) {
         error_log("Login fout: " . $e->getMessage());
         return "Er is een fout opgetreden bij het inloggen.";
     }
 }
 
+
 function haalBestellingenOp(PDO $conn, string $role, string $username): array
 {
     try {
         if ($role === 'Personnel') {
             $stmt = $conn->query("
-                SELECT po.order_id, po.client_name, po.datetime, po.status, po.address,
-                       (
-                           SELECT STRING_AGG(p.name + ' x' + CAST(pop.quantity AS VARCHAR), ', ')
-                           FROM Pizza_Order_Product pop
-                           JOIN Product p ON p.name = pop.product_name
-                           WHERE pop.order_id = po.order_id
-                       ) AS items,
-                       (
-                           SELECT SUM(p.price * pop.quantity)
-                           FROM Pizza_Order_Product pop
-                           JOIN Product p ON p.name = pop.product_name
-                           WHERE pop.order_id = po.order_id
-                       ) AS total_price
+                SELECT 
+                    po.order_id, 
+                    po.client_username, 
+                    po.client_name, 
+                    po.address, 
+                    po.datetime, 
+                    po.status
                 FROM Pizza_Order po
-                ORDER BY po.datetime DESC
+                ORDER BY po.datetime ASC
             ");
         } else {
             $stmt = $conn->prepare("
-                SELECT po.order_id, po.client_name, po.datetime, po.status, po.address,
-                       (
-                           SELECT STRING_AGG(p.name + ' x' + CAST(pop.quantity AS VARCHAR), ', ')
-                           FROM Pizza_Order_Product pop
-                           JOIN Product p ON p.name = pop.product_name
-                           WHERE pop.order_id = po.order_id
-                       ) AS items,
-                       (
-                           SELECT SUM(p.price * pop.quantity)
-                           FROM Pizza_Order_Product pop
-                           JOIN Product p ON p.name = pop.product_name
-                           WHERE pop.order_id = po.order_id
-                       ) AS total_price
+                SELECT 
+                    po.order_id, 
+                    po.client_username, 
+                    po.client_name, 
+                    po.address, 
+                    po.datetime, 
+                    po.status
                 FROM Pizza_Order po
                 WHERE po.client_username = :username
-                ORDER BY po.datetime DESC
+                ORDER BY po.datetime ASC
             ");
             $stmt->execute(['username' => $username]);
         }
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+
     } catch (PDOException $e) {
-        error_log("Fout bij ophalen bestellingen: " . $e->getMessage());
+        error_log("Error fetching orders: " . $e->getMessage());
         return [];
     }
 }
+
 
 function haalProductenUitWinkelmand(PDO $conn, array $cart): array
 {
@@ -214,16 +225,30 @@ function haalSamenvattingVanProducten(PDO $conn, array $producten): array
 function registreerNieuweGebruiker(PDO $conn, string $username, string $password, string $confirmPassword, string $firstName, string $lastName, string $address): ?string
 {
     try {
-        // Validation
+        // Input sanitization
+        $username = trim($username);
+        $firstName = trim($firstName);
+        $lastName = trim($lastName);
+        $address = trim($address);
+
+        // Basic validation
         if (empty($username) || empty($password) || empty($confirmPassword)) {
             return "Username and password fields are required.";
+        }
+
+        if (strlen($username) < 4 || strlen($username) > 30) {
+            return "Username must be between 4 and 30 characters.";
         }
 
         if ($password !== $confirmPassword) {
             return "Passwords do not match.";
         }
 
-        // Check if username exists
+        if (strlen($password) < 8) {
+            return "Password must be at least 8 characters long.";
+        }
+
+        // Check if username is already taken
         $stmt = $conn->prepare("SELECT COUNT(*) FROM [User] WHERE username = :username");
         $stmt->execute(['username' => $username]);
 
@@ -231,10 +256,10 @@ function registreerNieuweGebruiker(PDO $conn, string $username, string $password
             return "Username already exists. Please choose another.";
         }
 
-        // Hash the password
+        // Hash the password with bcrypt
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
 
-        // Insert user with role Client
+        // Insert new user with default role 'Client'
         $stmt = $conn->prepare("
             INSERT INTO [User] (username, password, first_name, last_name, address, role)
             VALUES (:username, :password, :first_name, :last_name, :address, 'Client')
@@ -248,13 +273,69 @@ function registreerNieuweGebruiker(PDO $conn, string $username, string $password
             'address' => $address
         ]);
 
-        // Success
-        return null;
+        return null; // success
 
     } catch (PDOException $e) {
         error_log("Signup error: " . $e->getMessage());
         return "An error occurred while creating your account. Please try again later.";
     }
 }
+
+
+function getUserByUsername(PDO $conn, string $username): ?array
+{
+    $stmt = $conn->prepare("SELECT username, first_name, last_name, address FROM [User] WHERE username = :username");
+    $stmt->execute(['username' => $username]);
+    return $stmt->fetch(PDO::FETCH_ASSOC);
+}
+
+function updateUserProfile(PDO $conn, string $username, string $firstName, string $lastName, string $address, string $newPassword = null): mixed
+{
+    try {
+        if ($newPassword) {
+            $hashed = password_hash($newPassword, PASSWORD_DEFAULT);
+            $stmt = $conn->prepare("
+                UPDATE [User]
+                SET first_name = :first, last_name = :last, address = :addr, password = :pass
+                WHERE username = :username
+            ");
+            $stmt->execute([
+                'first' => $firstName,
+                'last' => $lastName,
+                'addr' => $address,
+                'pass' => $hashed,
+                'username' => $username
+            ]);
+        } else {
+            $stmt = $conn->prepare("
+                UPDATE [User]
+                SET first_name = :first, last_name = :last, address = :addr
+                WHERE username = :username
+            ");
+            $stmt->execute([
+                'first' => $firstName,
+                'last' => $lastName,
+                'addr' => $address,
+                'username' => $username
+            ]);
+        }
+        return true;
+    } catch (PDOException $e) {
+        error_log("Profile update error: " . $e->getMessage());
+        return "Something went wrong.";
+    }
+}
+
+function updateOrderStatus(PDO $conn, int $orderId, int $newStatus): bool
+{
+    try {
+        $stmt = $conn->prepare("UPDATE Pizza_Order SET status = :status WHERE order_id = :id");
+        return $stmt->execute(['status' => $newStatus, 'id' => $orderId]);
+    } catch (PDOException $e) {
+        error_log("Error updating status: " . $e->getMessage());
+        return false;
+    }
+}
+
 
 ?>
