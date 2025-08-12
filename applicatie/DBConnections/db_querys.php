@@ -282,14 +282,14 @@ function registreerNieuweGebruiker(PDO $conn, string $username, string $password
 }
 
 
-function getUserByUsername(PDO $conn, string $username): ?array
+function haalGebruikerOp(PDO $conn, string $username): ?array
 {
     $stmt = $conn->prepare("SELECT username, first_name, last_name, address FROM [User] WHERE username = :username");
     $stmt->execute(['username' => $username]);
     return $stmt->fetch(PDO::FETCH_ASSOC);
 }
 
-function updateUserProfile(PDO $conn, string $username, string $firstName, string $lastName, string $address, string $newPassword = null): mixed
+function werkGebruikerBij(PDO $conn, string $username, string $firstName, string $lastName, string $address, string $newPassword = null): mixed
 {
     try {
         if ($newPassword) {
@@ -326,7 +326,7 @@ function updateUserProfile(PDO $conn, string $username, string $firstName, strin
     }
 }
 
-function updateOrderStatus(PDO $conn, int $orderId, int $newStatus): bool
+function wijzigBestelStatus(PDO $conn, int $orderId, int $newStatus): bool
 {
     try {
         $stmt = $conn->prepare("UPDATE Pizza_Order SET status = :status WHERE order_id = :id");

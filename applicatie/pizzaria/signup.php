@@ -15,11 +15,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lastName = trim($_POST['last_name'] ?? '');
     $address = trim($_POST['address'] ?? '');
 
-    // ✅ Call the registration function from db_querys.php
     $error = registreerNieuweGebruiker($conn, $username, $password, $confirmPassword, $firstName, $lastName, $address);
 
     if (!$error) {
-        // ✅ Redirect to login on success
         header("Location: login.php?registered=1");
         exit;
     }

@@ -10,7 +10,7 @@ if (!isset($_SESSION['user'])) {
 
 $conn = maakVerbinding();
 $username = $_SESSION['user']['username'];
-$userData = getUserByUsername($conn, $username);
+$userData = haalGebruikerOp($conn, $username);
 
 $success = '';
 $error = '';
@@ -24,17 +24,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($newPassword)) {
         if ($newPassword === $confirmPassword) {
-            $result = updateUserProfile($conn, $username, $firstName, $lastName, $address, $newPassword);
+            $result = werkGebruikerBij($conn, $username, $firstName, $lastName, $address, $newPassword);
         } else {
             $result = "Passwords do not match.";
         }
     } else {
-        $result = updateUserProfile($conn, $username, $firstName, $lastName, $address);
+        $result = werkGebruikerBij($conn, $username, $firstName, $lastName, $address);
     }
 
     if ($result === true) {
         $success = "Profile updated successfully.";
-        $userData = getUserByUsername($conn, $username); // Refresh user data
+        $userData = haalGebruikerOp($conn, $username); // Refresh user data
     } else {
         $error = $result;
     }

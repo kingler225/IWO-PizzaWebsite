@@ -18,7 +18,7 @@ $username = $_SESSION['user']['username'];
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['new_status']) && $role === 'Personnel') {
     $orderId = (int) $_POST['order_id'];
     $newStatus = (int) $_POST['new_status'];
-    updateOrderStatus($conn, $orderId, $newStatus);
+    wijzigBestelStatus($conn, $orderId, $newStatus);
     header("Location: orders.php");
     exit;
 }
