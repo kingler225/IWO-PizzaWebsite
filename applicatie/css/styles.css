@@ -12,7 +12,42 @@ body {
     line-height: 1.6;
 }
 
-/* Navigation bar */
+/* Animaties */
+@keyframes vervagenIn {
+    from {
+        opacity: 0;
+        transform: translateY(4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes knopIndrukken {
+    0% {
+        transform: scale(1);
+    }
+
+    50% {
+        transform: scale(0.98);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* Respecteer voorkeur voor minder animatie */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation: none !important;
+        transition: none !important;
+    }
+}
+
+/* Navigatiebalk */
 nav {
     background-color: #006341;
     padding: 15px 0;
@@ -46,14 +81,16 @@ nav a.active {
     color: #ffcc00;
 }
 
-/* Page content */
+/* Pagina-inhoud */
 main {
     padding: 30px 20px;
     max-width: 1000px;
     margin: 0 auto;
+    /* subtiele laad-animatie van de pagina */
+    animation: vervagenIn 300ms ease-out both;
 }
 
-/* Typography */
+/* Typografie */
 h1,
 h2 {
     color: #006341;
@@ -61,7 +98,7 @@ h2 {
     text-align: center;
 }
 
-/* Forms */
+/* Formulieren */
 form {
     background-color: #f4f4f4;
     border: 1px solid #ccc;
@@ -90,7 +127,7 @@ textarea {
     font-size: 15px;
 }
 
-/* Buttons */
+/* Knoppen */
 button {
     background-color: #ed1c24;
     color: white;
@@ -108,7 +145,12 @@ button:hover {
     background-color: #c4161c;
 }
 
-/* Tables */
+/* tactiele “indruk”-animatie */
+button:active {
+    animation: knopIndrukken 120ms ease;
+}
+
+/* Tabellen */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -128,7 +170,7 @@ table thead {
     color: white;
 }
 
-/* Footer */
+/* Voettekst */
 footer {
     background-color: #006341;
     color: white;
@@ -138,7 +180,7 @@ footer {
     text-align: center;
 }
 
-/* Responsive layout */
+/* Responsieve lay-out */
 @media (max-width: 768px) {
     nav ul {
         flex-direction: column;

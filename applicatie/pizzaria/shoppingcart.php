@@ -5,48 +5,69 @@ require_once __DIR__ . '/../DBConnections/db_querys.php';
 
 $conn = maakVerbinding();
 
-// Handle item removal
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['remove'])) {
-    unset($_SESSION['cart'][$_POST['remove']]);
-    header("Location: shoppingcart.php");
-    exit;
+$error = '';
+
+/* ---- Inline CSRF ---- */
+if (empty($_SESSION['csrf'])) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
 }
+$csrf = $_SESSION['csrf'];
+/* ---------------------- */
 
-// Load cart contents from session via db_querys helper
-$cart = $_SESSION['cart'] ?? [];
-$data = haalProductenUitWinkelmand($conn, $cart);
-$cartItems = $data['items'] ?? [];
-$total = $data['total'] ?? 0;
+/* POST-acties: altijd CSRF valideren */
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $postedToken = $_POST['csrf'] ?? '';
+    if (!$postedToken || !hash_equals($_SESSION['csrf'], $postedToken)) {
+        http_response_code(403);
+        exit('CSRF-validatie mislukt');
+    }
 
-// Handle checkout confirmation
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
-    $cart = $_SESSION['cart'] ?? [];
-    $username = $_SESSION['user']['username'] ?? null;
-    $clientName = $_POST['name'] ?? null;
-    $address = $_POST['address'] ?? null;
-
-    if (!empty($cart) && !empty($address)) {
-        $orderId = plaatsBestelling($conn, $username, $clientName, $address, $cart);
-
-        if ($orderId !== null) {
-            unset($_SESSION['cart']);
-            header("Location: orderdetails.php?order_id=$orderId");
-            exit;
-        } else {
-            $error = "Something went wrong while placing your order.";
+    // Item verwijderen
+    if (isset($_POST['remove'])) {
+        $removeName = (string) $_POST['remove'];
+        if (isset($_SESSION['cart'][$removeName])) {
+            unset($_SESSION['cart'][$removeName]);
         }
-    } else {
-        $error = "Please provide all required information.";
+        header("Location: shoppingcart.php"); // PRG-patroon
+        exit;
+    }
+
+    // Bestelling plaatsen (checkout)
+    if (isset($_POST['checkout'])) {
+        $cart = $_SESSION['cart'] ?? [];
+        $username = $_SESSION['user']['username'] ?? null;
+        $clientName = $_POST['name'] ?? null;
+        $address = trim($_POST['address'] ?? '');
+
+        if (!empty($cart) && $address !== '') {
+            $orderId = plaatsBestelling($conn, $username, $clientName, $address, $cart);
+
+            if ($orderId !== null) {
+                unset($_SESSION['cart']);
+                header("Location: orderdetails.php?order_id=" . urlencode((string) $orderId));
+                exit;
+            } else {
+                $error = "Er ging iets mis bij het plaatsen van je bestelling.";
+            }
+        } else {
+            $error = "Vul alle verplichte velden in.";
+        }
     }
 }
 
+/* Winkelmand laden en berekenen */
+$cart = $_SESSION['cart'] ?? [];
+$data = haalProductenUitWinkelmand($conn, $cart);
+$cartItems = $data['items'] ?? [];
+$total = $data['total'] ?? 0.0;
 ?>
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 
 <head>
     <meta charset="UTF-8">
-    <title>Shopping Cart</title>
+    <title>Winkelmand</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 
@@ -55,36 +76,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
     <?php include_once __DIR__ . '/../includes/navbar.php'; ?>
 
     <main>
-        <h1>Your Shopping Cart</h1>
+        <h1>Jouw winkelmand</h1>
 
         <?php if (empty($cartItems)): ?>
-            <p>Your cart is empty.</p>
+            <p>Je winkelmand is leeg.</p>
         <?php else: ?>
             <?php if (!empty($error)): ?>
-                <p style="color: red;"><?= htmlspecialchars($error) ?></p>
+                <p role="alert" style="color: red;"><?= htmlspecialchars($error, ENT_QUOTES, 'UTF-8') ?></p>
             <?php endif; ?>
 
-            <form method="POST">
-                <table border="1" width="100%">
+            <!-- Verwijderen van items -->
+            <form method="POST" action="">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+
+                <table>
                     <thead>
                         <tr>
-                            <th>Item</th>
-                            <th>Quantity</th>
-                            <th>Unit Price</th>
-                            <th>Subtotal</th>
-                            <th>Remove</th>
+                            <th>Artikel</th>
+                            <th>Aantal</th>
+                            <th>Stukprijs</th>
+                            <th>Subtotaal</th>
+                            <th>Verwijderen</th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ($cartItems as $item): ?>
                             <tr>
-                                <td><?= htmlspecialchars($item['name']) ?></td>
-                                <td><?= $item['quantity'] ?></td>
-                                <td>€<?= number_format($item['price'], 2, ',', '.') ?></td>
-                                <td>€<?= number_format($item['subtotal'], 2, ',', '.') ?></td>
+                                <td><?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?></td>
+                                <td><?= (int) $item['quantity'] ?></td>
+                                <td>€<?= number_format((float) $item['price'], 2, ',', '.') ?></td>
+                                <td>€<?= number_format((float) $item['subtotal'], 2, ',', '.') ?></td>
                                 <td>
                                     <button type="submit" name="remove"
-                                        value="<?= htmlspecialchars($item['name']) ?>">Remove</button>
+                                        value="<?= htmlspecialchars($item['name'], ENT_QUOTES, 'UTF-8') ?>">
+                                        Verwijderen
+                                    </button>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
@@ -92,24 +118,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['checkout'])) {
                 </table>
             </form>
 
-            <h2>Total: €<?= number_format($total, 2, ',', '.') ?></h2>
+            <h2>Totaal: €<?= number_format((float) $total, 2, ',', '.') ?></h2>
 
-            <form method="POST">
+            <!-- Afrekenen -->
+            <form method="POST" action="">
+                <input type="hidden" name="csrf" value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+
                 <?php if (!isset($_SESSION['user'])): ?>
-                    <label>Your Name: <input type="text" name="name" required></label><br>
+                    <label>Jouw naam:
+                        <input type="text" name="name" required>
+                    </label><br>
                 <?php else: ?>
-                    <input type="hidden" name="name" value="<?= htmlspecialchars($_SESSION['user']['username']) ?>">
+                    <input type="hidden" name="name"
+                        value="<?= htmlspecialchars($_SESSION['user']['username'], ENT_QUOTES, 'UTF-8') ?>">
                 <?php endif; ?>
-                <label>Delivery Address: <input type="text" name="address" required></label><br><br>
 
-                <button type="submit" name="checkout">Place Order</button>
+                <label>Bezorgadres:
+                    <input type="text" name="address" required>
+                </label><br><br>
+
+                <button type="submit" name="checkout">Bestelling plaatsen</button>
             </form>
         <?php endif; ?>
     </main>
 
     <footer>
-        <p>&copy; <?= date('Y') ?> Pizzeria Sole Machina. All rights reserved. |
-            <a href="privacystatement.php">Privacy Statement</a>
+        <p>&copy; <?= date('Y') ?> Pizzeria Sole Machina. Alle rechten voorbehouden. |
+            <a href="privacystatement.php">Privacyverklaring</a>
         </p>
     </footer>
 

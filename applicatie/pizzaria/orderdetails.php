@@ -1,39 +1,43 @@
 <?php
 session_start();
+
 require_once __DIR__ . '/../DBConnections/db_connection.php';
 require_once __DIR__ . '/../DBConnections/db_querys.php';
 
-if (!isset($_GET['order_id'])) {
-    echo "No order specified.";
+/* Vereist ingelogde gebruiker */
+if (empty($_SESSION['user'])) {
+    header('Location: login.php');
     exit;
 }
 
+$rol = $_SESSION['user']['role'] ?? null;
+$gebruikersnaam = $_SESSION['user']['username'] ?? null;
+
+/* Valideer order-id */
+if (!isset($_GET['order_id'])) {
+    http_response_code(400);
+    echo 'Geen bestelling opgegeven.';
+    exit;
+}
 $orderId = (int) $_GET['order_id'];
+if ($orderId <= 0) {
+    http_response_code(400);
+    echo 'Ongeldig bestelnummer.';
+    exit;
+}
+
 $conn = maakVerbinding();
-$stmt = $conn->prepare("
-    SELECT po.*, u.first_name, u.last_name
-    FROM Pizza_Order po
-    LEFT JOIN [User] u ON po.client_username = u.username
-    WHERE po.order_id = :id
-");
-$stmt->execute(['id' => $orderId]);
-$order = $stmt->fetch(PDO::FETCH_ASSOC);
 
-$stmt = $conn->prepare("
-    SELECT product_name, quantity
-    FROM Pizza_Order_Product
-    WHERE order_id = :id
-");
-$stmt->execute(['id' => $orderId]);
-$items = $stmt->fetchAll(PDO::FETCH_ASSOC);
+/* Gebruik query-helpers uit db_querys.php */
+$order = haalBestellingOp($conn, $orderId, $rol, $gebruikersnaam);
+$items = $order ? haalBestellingItemsOp($conn, $orderId) : [];
 ?>
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 
 <head>
     <meta charset="UTF-8">
-    <title>Order #<?= htmlspecialchars($orderId) ?> Details</title>
+    <title>Bestelling #<?= htmlspecialchars((string) $orderId, ENT_QUOTES, 'UTF-8') ?> - Details</title>
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 
@@ -41,27 +45,34 @@ $items = $stmt->fetchAll(PDO::FETCH_ASSOC);
     <?php include_once __DIR__ . '/../includes/navbar.php'; ?>
 
     <main>
-        <h1>Order #<?= htmlspecialchars($orderId) ?> Details</h1>
+        <h1>Bestelling #<?= htmlspecialchars((string) $orderId, ENT_QUOTES, 'UTF-8') ?> - Details</h1>
 
         <?php if (!$order): ?>
-            <p>Order not found.</p>
+            <p>Bestelling niet gevonden of je hebt geen toegang.</p>
         <?php else: ?>
-            <p><strong>Customer:</strong> <?= htmlspecialchars($order['client_name']) ?></p>
-            <p><strong>Address:</strong> <?= htmlspecialchars($order['address']) ?></p>
-            <p><strong>Date/Time:</strong> <?= htmlspecialchars($order['datetime']) ?></p>
-            <p><strong>Status:</strong> <?= htmlspecialchars($order['status']) ?></p>
+            <p><strong>Klant:</strong> <?= htmlspecialchars($order['klant_weergave'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
+            <p><strong>Adres:</strong> <?= htmlspecialchars($order['address'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
+            <p><strong>Datum/tijd:</strong> <?= htmlspecialchars($order['datetime'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
+            <p><strong>Status:</strong> <?= htmlspecialchars($order['status'] ?? '', ENT_QUOTES, 'UTF-8') ?></p>
 
-            <h2>Items</h2>
-            <ul>
-                <?php foreach ($items as $item): ?>
-                    <li><?= htmlspecialchars($item['quantity']) ?>x <?= htmlspecialchars($item['product_name']) ?></li>
-                <?php endforeach; ?>
-            </ul>
+            <h2>Artikelen</h2>
+            <?php if (empty($items)): ?>
+                <p>Geen artikelen gevonden voor deze bestelling.</p>
+            <?php else: ?>
+                <ul>
+                    <?php foreach ($items as $item): ?>
+                        <li>
+                            <?= (int) $item['quantity'] ?>×
+                            <?= htmlspecialchars($item['product_name'], ENT_QUOTES, 'UTF-8') ?>
+                        </li>
+                    <?php endforeach; ?>
+                </ul>
+            <?php endif; ?>
         <?php endif; ?>
     </main>
 
     <footer>
-        <p>&copy; <?= date('Y') ?> Pizzeria Sole Machina</p>
+        <p>&copy; <?= date('Y') ?> Pizzeria Sole Machina. Alle rechten voorbehouden.</p>
     </footer>
 </body>
 

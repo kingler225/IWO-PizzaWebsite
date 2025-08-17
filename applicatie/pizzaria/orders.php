@@ -1,7 +1,7 @@
 <?php
 session_start();
 
-if (!isset($_SESSION['user'])) {
+if (empty($_SESSION['user'])) {
     header("Location: login.php");
     exit;
 }
@@ -10,35 +10,55 @@ require_once __DIR__ . '/../DBConnections/db_connection.php';
 require_once __DIR__ . '/../DBConnections/db_querys.php';
 
 $conn = maakVerbinding();
+$role = $_SESSION['user']['role'] ?? null;
+$username = $_SESSION['user']['username'] ?? null;
+$isPersonnel = ($role === 'Personnel');
 
-$role = $_SESSION['user']['role'];
-$username = $_SESSION['user']['username'];
+/* ---- Inline CSRF ---- */
+if (empty($_SESSION['csrf'])) {
+    $_SESSION['csrf'] = bin2hex(random_bytes(32));
+}
+$csrf = $_SESSION['csrf'];
+/* ---------------------- */
 
-// Handle status update if Personnel
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['order_id'], $_POST['new_status']) && $role === 'Personnel') {
-    $orderId = (int) $_POST['order_id'];
-    $newStatus = (int) $_POST['new_status'];
-    wijzigBestelStatus($conn, $orderId, $newStatus);
+/* Statuslabels (NL) */
+$statusLabels = [
+    1 => 'Ontvangen',
+    2 => 'In behandeling',
+    3 => 'Afgerond',
+];
+
+/* Handteer status-update (alleen Personeel) */
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $isPersonnel) {
+    $postedToken = $_POST['csrf'] ?? '';
+    if (!$postedToken || !hash_equals($_SESSION['csrf'], $postedToken)) {
+        http_response_code(403);
+        exit('CSRF-validatie mislukt');
+    }
+
+    $orderId = isset($_POST['order_id']) ? (int) $_POST['order_id'] : 0;
+    $newStatus = filter_var($_POST['new_status'] ?? null, FILTER_VALIDATE_INT);
+
+    if ($orderId > 0 && in_array($newStatus, [1, 2, 3], true)) {
+        wijzigBestelStatus($conn, $orderId, $newStatus);
+    }
     header("Location: orders.php");
     exit;
 }
 
+/* Haal bestellingen op via helper (autorisatielogica in helper) */
 $orders = haalBestellingenOp($conn, $role, $username);
 
-// Optional: status labels for better readability
-$statusLabels = [
-    1 => 'Received',
-    2 => 'In Progress',
-    3 => 'Completed'
-];
+/* Titel/kop */
+$pageTitle = $isPersonnel ? 'Alle bestellingen' : 'Mijn bestellingen';
 ?>
-
 <!DOCTYPE html>
-<html lang="en">
+<html lang="nl">
 
 <head>
     <meta charset="UTF-8">
-    <title><?= $role === 'Personnel' ? 'All Orders' : 'My Orders' ?></title>
+    <title><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></title>
+    <meta name="viewport" content="width=device-width,initial-scale=1">
     <link rel="stylesheet" href="../css/styles.css">
 </head>
 
@@ -47,52 +67,62 @@ $statusLabels = [
     <?php include_once __DIR__ . '/../includes/navbar.php'; ?>
 
     <main>
-        <h1><?= $role === 'Personnel' ? 'All Orders' : 'My Orders' ?></h1>
+        <h1><?= htmlspecialchars($pageTitle, ENT_QUOTES, 'UTF-8') ?></h1>
 
         <?php if (empty($orders)): ?>
-            <p>No orders found.</p>
+            <p>Geen bestellingen gevonden.</p>
         <?php else: ?>
-            <table border="1" width="100%" cellpadding="10" style="margin-top: 20px;">
+            <table>
                 <thead>
                     <tr>
-                        <th>Order ID</th>
-                        <th>Customer Name</th>
-                        <th>Address</th>
-                        <th>Date/Time</th>
+                        <th>Bestelnr.</th>
+                        <th>Klant</th>
+                        <th>Adres</th>
+                        <th>Datum/tijd</th>
                         <th>Status</th>
-                        <?php if ($role === 'Personnel'): ?>
-                            <th>Action</th>
+                        <?php if ($isPersonnel): ?>
+                            <th>Actie</th>
                         <?php endif; ?>
                     </tr>
                 </thead>
                 <tbody>
                     <?php foreach ($orders as $order): ?>
-                        <tr id="order<?= htmlspecialchars($order['order_id']) ?>">
+                        <?php
+                        $orderId = (int) $order['order_id'];
+                        $klantWeergave = $order['klant_weergave']
+                            ?? ($order['client_name'] ?? $order['client_username'] ?? '');
+                        $status = (int) ($order['status'] ?? 0);
+                        ?>
+                        <tr id="order<?= htmlspecialchars((string) $orderId, ENT_QUOTES, 'UTF-8') ?>">
                             <td>
-                                <a href="orderdetails.php?order_id=<?= urlencode($order['order_id']) ?>">
-                                    #<?= htmlspecialchars($order['order_id']) ?>
+                                <a href="orderdetails.php?order_id=<?= urlencode((string) $orderId) ?>">
+                                    #<?= htmlspecialchars((string) $orderId, ENT_QUOTES, 'UTF-8') ?>
                                 </a>
                             </td>
-                            <td><?= htmlspecialchars($order['client_name'] ?? $order['client_username']) ?></td>
-                            <td><?= htmlspecialchars($order['address']) ?></td>
-                            <td><?= htmlspecialchars($order['datetime']) ?></td>
+                            <td><?= htmlspecialchars($klantWeergave, ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($order['address'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
+                            <td><?= htmlspecialchars($order['datetime'] ?? '', ENT_QUOTES, 'UTF-8') ?></td>
                             <td>
-                                <?php if ($role === 'Personnel'): ?>
-                                    <form method="POST" style="display:inline;">
-                                        <input type="hidden" name="order_id" value="<?= $order['order_id'] ?>">
-                                        <select name="new_status">
-                                            <option value="1" <?= $order['status'] == 1 ? 'selected' : '' ?>>Received</option>
-                                            <option value="2" <?= $order['status'] == 2 ? 'selected' : '' ?>>In Progress</option>
-                                            <option value="3" <?= $order['status'] == 3 ? 'selected' : '' ?>>Completed</option>
+                                <?php if ($isPersonnel): ?>
+                                    <form method="POST" style="display:inline">
+                                        <input type="hidden" name="csrf"
+                                            value="<?= htmlspecialchars($csrf, ENT_QUOTES, 'UTF-8') ?>">
+                                        <input type="hidden" name="order_id"
+                                            value="<?= htmlspecialchars((string) $orderId, ENT_QUOTES, 'UTF-8') ?>">
+                                        <select name="new_status"
+                                            aria-label="Wijzig status voor bestelling #<?= htmlspecialchars((string) $orderId, ENT_QUOTES, 'UTF-8') ?>">
+                                            <option value="1" <?= $status === 1 ? 'selected' : '' ?>><?= $statusLabels[1] ?></option>
+                                            <option value="2" <?= $status === 2 ? 'selected' : '' ?>><?= $statusLabels[2] ?></option>
+                                            <option value="3" <?= $status === 3 ? 'selected' : '' ?>><?= $statusLabels[3] ?></option>
                                         </select>
-                                        <button type="submit">Update</button>
+                                        <button type="submit">Bijwerken</button>
                                     </form>
                                 <?php else: ?>
-                                    <?= $statusLabels[$order['status']] ?? 'Unknown' ?>
+                                    <?= htmlspecialchars($statusLabels[$status] ?? 'Onbekend', ENT_QUOTES, 'UTF-8') ?>
                                 <?php endif; ?>
                             </td>
-                            <?php if ($role === 'Personnel'): ?>
-                                <td><!-- Optional: Add extra personnel-only action here --></td>
+                            <?php if ($isPersonnel): ?>
+                                <td><!-- Eventuele extra actie voor personeel --></td>
                             <?php endif; ?>
                         </tr>
                     <?php endforeach; ?>
@@ -102,7 +132,7 @@ $statusLabels = [
     </main>
 
     <footer>
-        <p>&copy; <?= date('Y') ?> Pizzeria. All rights reserved.</p>
+        <p>&copy; <?= date('Y') ?> Pizzeria. Alle rechten voorbehouden.</p>
     </footer>
 </body>
 
